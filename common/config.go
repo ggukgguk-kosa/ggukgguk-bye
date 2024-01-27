@@ -9,7 +9,6 @@ import (
 var config Config
 
 func InitConfig() Config {
-	viper.SetDefault("NEXT_STEP", 1)
 	viper.SetConfigName("ggukgguk-bye")
 	viper.SetConfigType("toml")
 	viper.AddConfigPath(".")

@@ -1,2 +1,2 @@
 DB_URI = "id:pass@tcp(host:3306)/ggukgguk?parseTime=true"
-NEXT_SETP  = 1
+NEXT_STEP  = 1
