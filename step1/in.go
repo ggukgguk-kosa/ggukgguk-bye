@@ -8,6 +8,7 @@ import (
 	"github.com/ggukgguk-kosa/ggukgguk-bye/models"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/volatiletech/sqlboiler/v4/boil"
+	. "github.com/volatiletech/sqlboiler/v4/queries/qm"
 )
 
 var dbPt *sql.DB
@@ -31,14 +32,20 @@ func ReadAndWrite(members models.MemberSlice) {
 	log.Println("operate start")
 	for _, m := range members {
 		log.Println("start - " + m.MemberEmail.String)
-		documents := getDocumentsOf(*m)
+
+		meta := getMetaOf(*m)
+
+		uploadedDocuments := getDocumentsOf(*m)
+		sharedDocuments := getSharedDocumentsOf(*m)
+		documents := append(uploadedDocuments, sharedDocuments...)
+
 		printDocument(Author{
 			ID:        m.MemberID,
 			Name:      m.MemberName,
 			Nickname:  m.MemberNickname,
 			Email:     m.MemberEmail.String,
 			CreatedAt: m.MemberCreatedAt,
-		}, documents)
+		}, meta, documents)
 	}
 }
 
@@ -60,18 +67,20 @@ func getDocumentsOf(member models.Member) []Document {
 		mediaFile := loadMediaFileOf(*r)
 		if mediaFile.MediaFileID == "" || mediaFile.MediaFileBlocked.Bool {
 			documents = append(documents, Document{
-				Author:    r.MemberID,
-				Content:   r.RecordComment.String,
-				CreatedAt: r.RecordCreatedAt,
-				IsOpen:    r.RecordIsOpen,
-				ShareTo:   r.RecordShareTo.String,
-				Replies:   documentReplies,
+				Author:         r.MemberID,
+				AuthorNickname: member.MemberNickname,
+				Content:        r.RecordComment.String,
+				CreatedAt:      r.RecordCreatedAt,
+				IsOpen:         r.RecordIsOpen,
+				ShareTo:        r.RecordShareTo.String,
+				Replies:        documentReplies,
 			})
 		} else {
 			documents = append(documents, Document{
-				Author:    r.MemberID,
-				Content:   r.RecordComment.String,
-				CreatedAt: r.RecordCreatedAt,
+				Author:         r.MemberID,
+				AuthorNickname: member.MemberNickname,
+				Content:        r.RecordComment.String,
+				CreatedAt:      r.RecordCreatedAt,
 				Media: DocumentMedia{
 					ID:   mediaFile.MediaFileID,
 					Type: mediaFile.MediaTypeID,
@@ -84,6 +93,70 @@ func getDocumentsOf(member models.Member) []Document {
 	}
 
 	return documents
+}
+
+func getSharedDocumentsOf(member models.Member) []Document {
+	var documents []Document
+
+	records := loadAllSharedRecordsOf(member)
+	for _, r := range records {
+		author := loadAuthorOf(*r)
+
+		replies := loadAllReplyOf(*r)
+		var documentReplies []DocumentReply
+		for _, repl := range replies {
+			documentReplies = append(documentReplies, DocumentReply{
+				Content:   repl.ReplyContent,
+				CreatedAt: repl.ReplyDate,
+				Author:    repl.MemberID,
+			})
+		}
+
+		mediaFile := loadMediaFileOf(*r)
+		if mediaFile.MediaFileID == "" || mediaFile.MediaFileBlocked.Bool {
+			documents = append(documents, Document{
+				Author:         r.MemberID,
+				AuthorNickname: author.MemberNickname,
+				Content:        r.RecordComment.String,
+				CreatedAt:      r.RecordCreatedAt,
+				IsOpen:         r.RecordIsOpen,
+				ShareTo:        r.RecordShareTo.String,
+				Replies:        documentReplies,
+			})
+		} else {
+			documents = append(documents, Document{
+				Author:         r.MemberID,
+				AuthorNickname: author.MemberNickname,
+				Content:        r.RecordComment.String,
+				CreatedAt:      r.RecordCreatedAt,
+				Media: DocumentMedia{
+					ID:   mediaFile.MediaFileID,
+					Type: mediaFile.MediaTypeID,
+				},
+				IsOpen:  r.RecordIsOpen,
+				ShareTo: r.RecordShareTo.String,
+				Replies: documentReplies,
+			})
+		}
+	}
+
+	return documents
+}
+
+func getMetaOf(member models.Member) []MetaOfDocuments {
+	var meta []MetaOfDocuments
+
+	diaries := loadAllDiaries(member)
+	for _, d := range diaries {
+		meta = append(meta, MetaOfDocuments{
+			Year:    d.DiaryYear,
+			Month:   d.DiaryMonth,
+			Color:   d.MainColor,
+			Keyword: d.MainKeyword,
+		})
+	}
+
+	return meta
 }
 
 func LoadAllMembers() models.MemberSlice {
@@ -114,6 +187,26 @@ func loadAllRecordsOf(member models.Member) models.RecordSlice {
 	ctx := context.Background()
 
 	records, err := member.Records().AllG(ctx)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return models.RecordSlice{}
+		}
+
+		log.Printf("DB 작업 중 오류 발생 - loadAllRecordsOf")
+		DBClose()
+		log.Fatal(err.Error())
+		return models.RecordSlice{}
+	}
+
+	return records
+}
+
+func loadAllSharedRecordsOf(member models.Member) models.RecordSlice {
+	ctx := context.Background()
+
+	records, err := models.Records(
+		Where("record_share_to = ? and record_share_accepted = True", member.MemberID),
+	).AllG(ctx)
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			return models.RecordSlice{}
@@ -163,4 +256,38 @@ func loadMediaFileOf(record models.Record) models.MediaFile {
 	}
 
 	return *mediaFile
+}
+
+func loadAllDiaries(member models.Member) models.DiarySlice {
+	ctx := context.Background()
+
+	diaries, err := member.Diaries().AllG(ctx)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return models.DiarySlice{}
+		}
+
+		log.Printf("DB 작업 중 오류 발생 - loadAllReplyOf")
+		DBClose()
+		log.Fatal(err.Error())
+	}
+
+	return diaries
+}
+
+func loadAuthorOf(record models.Record) models.Member {
+	ctx := context.Background()
+
+	member, err := record.Member().OneG(ctx)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return models.Member{}
+		}
+
+		log.Printf("DB 작업 중 오류 발생 - loadAllReplyOf")
+		DBClose()
+		log.Fatal(err.Error())
+	}
+
+	return *member
 }
