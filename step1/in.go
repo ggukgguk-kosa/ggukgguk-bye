@@ -172,7 +172,6 @@ func LoadAllMembers() models.MemberSlice {
 		log.Printf("DB 작업 중 오류 발생 - LoadAllMembers")
 		DBClose()
 		log.Fatal(err.Error())
-		return models.MemberSlice{}
 	}
 
 	return members
@@ -195,7 +194,6 @@ func loadAllRecordsOf(member models.Member) models.RecordSlice {
 		log.Printf("DB 작업 중 오류 발생 - loadAllRecordsOf")
 		DBClose()
 		log.Fatal(err.Error())
-		return models.RecordSlice{}
 	}
 
 	return records
@@ -215,7 +213,6 @@ func loadAllSharedRecordsOf(member models.Member) models.RecordSlice {
 		log.Printf("DB 작업 중 오류 발생 - loadAllRecordsOf")
 		DBClose()
 		log.Fatal(err.Error())
-		return models.RecordSlice{}
 	}
 
 	return records
@@ -233,7 +230,6 @@ func loadAllReplyOf(record models.Record) models.ReplySlice {
 		log.Printf("DB 작업 중 오류 발생 - loadAllReplyOf")
 		DBClose()
 		log.Fatal(err.Error())
-		return models.ReplySlice{}
 	}
 
 	return reply
