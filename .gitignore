@@ -1,2 +1,6 @@
 dist/
+workdir/
+files/
 *.toml
+credentials.json
+token.json
