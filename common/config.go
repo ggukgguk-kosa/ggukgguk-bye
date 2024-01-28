@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/spf13/viper"
 )
@@ -20,7 +21,11 @@ func InitConfig() Config {
 	config = Config{
 		DBUri:    viper.GetString("DB_URI"),
 		NextStep: viper.GetInt("NEXT_STEP"),
+		FilePath: viper.GetString("FILE_PATH"),
 	}
+
+	log.Println("init config: ")
+	log.Println(config)
 
 	return config
 }
@@ -32,4 +37,5 @@ func getConfig() Config {
 type Config struct {
 	DBUri    string
 	NextStep int
+	FilePath string
 }

@@ -31,7 +31,7 @@ func DBInit(dbUri string) {
 func ReadAndWrite(members models.MemberSlice) {
 	log.Println("operate start")
 	for _, m := range members {
-		log.Println("start - " + m.MemberEmail.String)
+		log.Println("step1 - in - " + m.MemberEmail.String)
 
 		meta := getMetaOf(*m)
 
@@ -39,7 +39,7 @@ func ReadAndWrite(members models.MemberSlice) {
 		sharedDocuments := getSharedDocumentsOf(*m)
 		documents := append(uploadedDocuments, sharedDocuments...)
 
-		printDocument(Author{
+		MakePdf(Author{
 			ID:        m.MemberID,
 			Name:      m.MemberName,
 			Nickname:  m.MemberNickname,
@@ -60,7 +60,7 @@ func getDocumentsOf(member models.Member) []Document {
 			documentReplies = append(documentReplies, DocumentReply{
 				Content:   repl.ReplyContent,
 				CreatedAt: repl.ReplyDate,
-				Author:    repl.MemberID,
+				Author:    loadReplyAuthorOf(*repl).MemberNickname,
 			})
 		}
 
@@ -108,7 +108,7 @@ func getSharedDocumentsOf(member models.Member) []Document {
 			documentReplies = append(documentReplies, DocumentReply{
 				Content:   repl.ReplyContent,
 				CreatedAt: repl.ReplyDate,
-				Author:    repl.MemberID,
+				Author:    loadReplyAuthorOf(*repl).MemberNickname,
 			})
 		}
 
@@ -275,6 +275,23 @@ func loadAuthorOf(record models.Record) models.Member {
 	ctx := context.Background()
 
 	member, err := record.Member().OneG(ctx)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return models.Member{}
+		}
+
+		log.Printf("DB 작업 중 오류 발생 - loadAllReplyOf")
+		DBClose()
+		log.Fatal(err.Error())
+	}
+
+	return *member
+}
+
+func loadReplyAuthorOf(reply models.Reply) models.Member {
+	ctx := context.Background()
+
+	member, err := reply.Member().OneG(ctx)
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			return models.Member{}

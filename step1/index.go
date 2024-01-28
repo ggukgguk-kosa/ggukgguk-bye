@@ -6,6 +6,7 @@ import (
 
 func Start(config common.Config) {
 	DBInit(config.DBUri)
+	PdfInit(config.FilePath)
 	ReadAndWrite(LoadAllMembers())
 	DBClose()
 }
