@@ -119,6 +119,11 @@ func makeDocumentContent(member Author, document Document) (string, string) {
 func MakePdf(member Author, diaries []MetaOfDocuments, documents []Document) {
 	log.Println("step1 - out - " + member.Email)
 
+	if member.Email == "" || len(documents) == 0 {
+		log.Println("step1 - skip - " + member.Email)
+		return
+	}
+
 	pdf := fpdf.New("P", "mm", "A4", "")
 
 	// first page
@@ -210,9 +215,12 @@ func MakePdf(member Author, diaries []MetaOfDocuments, documents []Document) {
 		pdf.SetFont("Pretendard", "", 12)
 		pdf.MultiCell(0, 10, content, "", "", false)
 	}
-	pdf.SetFont("Pretendard", "", 18)
 
-	err := pdf.OutputFileAndClose("./workdir/" + member.Email)
+	if err := os.MkdirAll("./workdir/"+member.Email+"/", os.ModePerm); err != nil {
+		fmt.Println(err)
+	}
+
+	err := pdf.OutputFileAndClose("./workdir/" + member.Email + "/ggukgguk-archive.pdf")
 
 	if err != nil {
 		log.Printf("PDF 작업 중 오류 발생 - MakePdf")
